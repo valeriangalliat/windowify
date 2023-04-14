@@ -1,0 +1,192 @@
+#!/usr/bin/env swift
+
+import Cocoa
+
+let usage = """
+  Usage: windowify [options] [<attribute>...] <file>
+
+  Arguments:
+    <file>       Path to an image.
+    <attribute>  Attribute name, prefixed with `+` or `-` to enable or disable it.
+
+  Options:
+    -h, --help       Show help.
+    --title <title>  Set title.
+    --minimal        Shortcut for `-closable -miniaturizable -resizable +fullSizeContentView +titlebarAppearsTransparent +titleHidden`.
+
+  Attributes:
+    (+|-)titled                      [default: true]
+    (+|-)closable                    [default: true]
+    (+|-)miniaturizable              [default: true]
+    (+|-)resizable                   [default: true]
+    (+|-)fullSizeContentView         [default: false]
+    (+|-)titlebarAppearsTransparent  [default: false]
+    (+|-)titleHidden                 [default: false]
+    (+|-)closeButtonHidden           [default: false]
+    (+|-)miniaturizeButtonHidden     [default: false]
+    (+|-)zoomButtonHidden            [default: false]
+  """
+
+var path: String? = nil
+var title = ""
+var titled = true
+var closable = true
+var miniaturizable = true
+var resizable = true
+var fullSizeContentView = false
+var titlebarAppearsTransparent = false
+var titleHidden = false
+var closeButtonHidden = false
+var miniaturizeButtonHidden = false
+var zoomButtonHidden = false
+
+let args = CommandLine.arguments.dropFirst()
+var skip = false
+
+for (i, arg) in args.enumerated() {
+  if skip {
+    skip = false
+    continue
+  }
+
+  switch arg {
+  case "-h", "--help":
+    print(usage)
+    exit(0)
+
+  case "--title":
+    guard i + 1 < args.count else {
+      print("Missing argument for `--title`")
+      exit(1)
+    }
+
+    title = args[args.startIndex + i + 1]
+    skip = true
+
+  case "--minimal":
+    closable = false
+    miniaturizable = false
+    resizable = false
+    fullSizeContentView = true
+    titlebarAppearsTransparent = true
+    titleHidden = true
+
+  case "+titled": titled = true
+  case "-titled": titled = false
+  case "+closable": closable = true
+  case "-closable": closable = false
+  case "+miniaturizable": miniaturizable = true
+  case "-miniaturizable": miniaturizable = false
+  case "+resizable": resizable = true
+  case "-resizable": resizable = false
+  case "+fullSizeContentView": fullSizeContentView = true
+  case "-fullSizeContentView": fullSizeContentView = false
+  case "+titlebarAppearsTransparent": titlebarAppearsTransparent = true
+  case "-titlebarAppearsTransparent": titlebarAppearsTransparent = false
+  case "+titleHidden": titleHidden = true
+  case "-titleHidden": titleHidden = false
+  case "+closeButtonHidden": closeButtonHidden = true
+  case "-closeButtonHidden": closeButtonHidden = false
+  case "+miniaturizeButtonHidden": miniaturizeButtonHidden = true
+  case "-miniaturizeButtonHidden": miniaturizeButtonHidden = false
+  case "+zoomButtonHidden": zoomButtonHidden = true
+  case "-zoomButtonHidden": zoomButtonHidden = false
+
+  default:
+    guard path == nil else {
+      print("Cannot pass more than one file")
+      exit(1)
+    }
+
+    path = arg
+  }
+}
+
+guard let path = path else {
+  print(usage)
+  exit(1)
+}
+
+guard FileManager.default.fileExists(atPath: path) else {
+  print("Error: `\(path)` not found")
+  exit(1)
+}
+
+let maybeImage = NSImage(byReferencingFile: path)
+
+guard maybeImage != nil && maybeImage!.size != .zero else {
+  print("Error: invalid image in `\(path)`")
+  exit(1)
+}
+
+let image = maybeImage!
+
+var style: NSWindow.StyleMask = []
+
+if titled { style.insert(.titled) }
+if closable { style.insert(.closable) }
+if miniaturizable { style.insert(.miniaturizable) }
+if resizable { style.insert(.resizable) }
+if fullSizeContentView { style.insert(.fullSizeContentView) }
+
+class AppDelegate: NSObject, NSApplicationDelegate {
+
+  // Need to hold a reference to the window to prevent crash when closed.
+  // See <https://stackoverflow.com/a/72836367/4324668>.
+  var window: NSWindow!
+
+  func applicationDidFinishLaunching(_ notification: Notification) {
+    let app = NSApplication.shared
+
+    app.setActivationPolicy(.regular)
+    app.activate(ignoringOtherApps: true)
+
+    let mainMenu = NSMenu()
+    let mainMenuItem = mainMenu.addItem(withTitle: "", action: nil, keyEquivalent: "")
+    let appMenu = NSMenu()
+
+    mainMenuItem.submenu = appMenu
+    appMenu.addItem(withTitle: "Quit", action: #selector(app.terminate), keyEquivalent: "w")
+    app.mainMenu = mainMenu
+
+    print(image.size)
+
+    let view = NSImageView(
+      frame: NSRect(x: 0, y: 0, width: image.size.width, height: image.size.height))
+
+    view.image = image
+
+    window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: image.size.width, height: image.size.height),
+      styleMask: style,
+      backing: .buffered,
+      defer: false
+    )
+
+    window.title = title
+    window.titlebarAppearsTransparent = titlebarAppearsTransparent
+
+    if titleHidden { window.titleVisibility = .hidden }
+    if closeButtonHidden { window.standardWindowButton(.closeButton)?.isHidden = true }
+    if miniaturizeButtonHidden { window.standardWindowButton(.miniaturizeButton)?.isHidden = true }
+    if zoomButtonHidden { window.standardWindowButton(.zoomButton)?.isHidden = true }
+
+    window.contentView = view
+
+    window.makeKeyAndOrderFront(nil)
+    window.center()
+  }
+
+  // See <https://stackoverflow.com/a/65743682/4324668>.
+  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+    return true
+  }
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+
+app.delegate = delegate
+app.run()
+
+// vim: ft=swift

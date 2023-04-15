@@ -149,8 +149,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     appMenu.addItem(withTitle: "Quit", action: #selector(app.terminate), keyEquivalent: "w")
     app.mainMenu = mainMenu
 
-    print(image.size)
-
     let view = NSImageView(
       frame: NSRect(x: 0, y: 0, width: image.size.width, height: image.size.height))
 

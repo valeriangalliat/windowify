@@ -69,3 +69,10 @@ windowify --minimal example.jpg
 ```
 
 ![Screenshot of window showing the image with no title bar](../../raw/screenshots/minimal.png)
+
+## Why?
+
+The reason I initially developed that was to fake a screenshot of a
+macOS dialog with the native transparent shadow. See
+[blog post](https://www.codejam.info/2023/04/macos-screenshot-dialog.html)
+for details!
